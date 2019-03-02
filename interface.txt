@@ -1,8 +1,8 @@
 void main()	//reads command line and calls functions
-void readInfo(dict varDict, list constraintList)  //puts each variable with it's appropriate value range in varDict, as well as each constraint in constraintList
-dict solveConstraints(dict varDict, list constraintList)	//returns a dictionary with each value and it's corresponding value to solve the constraints
+(dict, list) readInfo(string varFile, string constFile)  //puts each variable with it's appropriate value range in varDict, as well as each constraint in constraintList
+dict solveConstraints(dict varDict, list constraintList, dict varAssignments, bool fc)	//returns a dictionary with each value and it's corresponding value to solve the constraints
 char getVariable(list assignedVars, dict varDict, list constraintList)		//returns the variable to assign a value to based on the heuristics
-int getValue(list assignedVars, dict varDict, char variable, list constraintList)		//returns the value to assign based on the heuristics
+int getValue(dict varAssignments, dict varDict, char variable, list constraintList)		//returns the value to assign based on the heuristics
 boolean forwardCheck(dict varDict)		//returns true if there is at least one remaining value for each variable
 
 constraint: [first, operation, second]
