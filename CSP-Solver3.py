@@ -35,7 +35,7 @@ def getValue(varAssignments, varDict, varToAssign, constraints, fc):
         varAssignments[varToAssign] = val # assign it
 
         for var in unassignedVars:
-            thisDict[var] = findCandidateValues(varAssignments, varDict, var, constraints)
+            thisDict[var] = findUnremovedValues(varAssignments, varDict, var, constraints, varToAssign)
             numberOfAllRemainingValues += len(thisDict[var])
         if numberOfAllRemainingValues > mostVals:
             mostVals = numberOfAllRemainingValues
@@ -60,6 +60,24 @@ def findCandidateValues(varAssignments, varDict, varToAssign, constraints):
                         candidateValues.remove(val)
 
         elif constraint[2] == varToAssign and constraint[0] in assignedVars:
+                
+                for val in varDict[varToAssign]:
+                    if val in candidateValues and not compare(varAssignments[constraint[0]], constraint[1], val):
+                        candidateValues.remove(val)
+
+    return candidateValues
+
+def findUnremovedValues(varAssignments, varDict, varToAssign, constraints, assignedVar):
+    candidateValues = copy.copy(varDict[varToAssign])
+    for constraint in constraints:
+        if constraint[0] == varToAssign and constraint[2] == assignedVar:
+                
+                for val in varDict[varToAssign]:
+                    
+                    if val in candidateValues and not compare(val, constraint[1], varAssignments[constraint[2]]):
+                        candidateValues.remove(val)
+
+        elif constraint[2] == varToAssign and constraint[0] == assignedVar:
                 
                 for val in varDict[varToAssign]:
                     if val in candidateValues and not compare(varAssignments[constraint[0]], constraint[1], val):
@@ -239,10 +257,11 @@ def solveConstraints(varDict, constraints, varAssignments, varOrder, fc):
         solved = True
 
         if fc:  #If we're forward checking, use the variable dictionary obtained above and check for variables without legal values
-            varDict = newVarDict
             for key in newVarDict:
-                if len(varDict[key]) == 0:
+                if len(newVarDict[key]) == 0:
                     solved = False
+        else:
+            newVarDict = varDict
 
         if solved:  #If there wasn't an issue with error checking, find out if there are any constraints we're violating
             for constraint in constraints:
@@ -266,16 +285,14 @@ def solveConstraints(varDict, constraints, varAssignments, varOrder, fc):
                         if varAssignments[var1] == varAssignments[var2]:
                             solved = False
                             break
-
-        if not solved:  #If there was some error above, print a failure and return
+                        
+        if not solved:  #If there was some error above, print a failure and try the next value
             toPrint = str(path) + ". "
             for var in varOrder:
                 toPrint += var + "=" + varAssignments[var] + ", "
             toPrint = toPrint[:len(toPrint)-2] + "  failure"
             print toPrint
             path += 1
-            print varAssignments
-            print varDict
             varDict[varToAssign].remove(varAssignments[varToAssign])
             del varAssignments[varToAssign]
         elif len(varAssignments) == len(varDict):   #If there was no issue, print the solution and return
@@ -286,7 +303,7 @@ def solveConstraints(varDict, constraints, varAssignments, varOrder, fc):
             print toPrint
             return True
         else:   #If it neither failed nor succeeded, try the next variable
-            success = solveConstraints(varDict.copy(), constraints, varAssignments.copy(), varOrder, fc)
+            success = solveConstraints(copy.deepcopy(newVarDict), constraints, varAssignments, varOrder, fc)
             if success == True: #If that succeeded, stop searching
                 return True
             else:
