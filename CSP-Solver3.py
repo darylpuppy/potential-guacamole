@@ -25,12 +25,10 @@ def getValue(varAssignments, varDict, varToAssign, constraints, fc):
     # now choose which of these values?
     # actually assign it,
 
-    mostVals = 0
+    mostVals = -1
     # after assigning a possible value to a variable
     # add all values still possible to the rest of the variables
-    print varToAssign
     for val in candidateValues:
-        print "Assigned to " + str(val)
         thisDict = {}
         
         numberOfAllRemainingValues = 0
@@ -39,7 +37,6 @@ def getValue(varAssignments, varDict, varToAssign, constraints, fc):
         for var in unassignedVars:
             thisDict[var] = findCandidateValues(varAssignments, varDict, var, constraints)
             numberOfAllRemainingValues += len(thisDict[var])
-            print var + " has " + str(len(thisDict[var])) + " remaining values"#, they are: " + str(thisDict[var])
         if numberOfAllRemainingValues > mostVals:
             mostVals = numberOfAllRemainingValues
             bestDict = thisDict
@@ -47,7 +44,8 @@ def getValue(varAssignments, varDict, varToAssign, constraints, fc):
         
 
     for var in assignedVars:
-        bestDict[var] = varAssignments[var]
+        bestDict[var] = varDict[var]
+    bestDict[varToAssign] = varDict[var]
     return (bestVal, bestDict)
 
 def findCandidateValues(varAssignments, varDict, varToAssign, constraints):
@@ -56,16 +54,15 @@ def findCandidateValues(varAssignments, varDict, varToAssign, constraints):
     for constraint in constraints:
         if constraint[0] == varToAssign and constraint[2] in assignedVars:
                 
-                for val in candidateValues:
+                for val in varDict[varToAssign]:
                     
-                    if not compare(val, constraint[1], varAssignments[constraint[2]]):
+                    if val in candidateValues and not compare(val, constraint[1], varAssignments[constraint[2]]):
                         candidateValues.remove(val)
 
         elif constraint[2] == varToAssign and constraint[0] in assignedVars:
                 
-                for val in candidateValues:
-                    
-                    if not compare(varAssignments[constraint[0]], constraint[1], val):
+                for val in varDict[varToAssign]:
+                    if val in candidateValues and not compare(varAssignments[constraint[0]], constraint[1], val):
                         candidateValues.remove(val)
 
     return candidateValues
@@ -111,7 +108,6 @@ def findMostConstrainingVariable(candidateVariables, varAssignments, varDict, co
             if constraint[0] == var or constraint[2] == var:
                 if not constraint[0] in assignedVars and not constraint[2] in assignedVars:
                     dictNumberOfConstraints[var] += 1
-    print dictNumberOfConstraints
                     
         
 
@@ -198,13 +194,14 @@ def compare(a, operator, b):
         if (a == b):
             return True
 
-    elif (operator == ">"):
+    elif (operator == '>'):
         if (a > b):
             return True
 
     elif (operator == "<"):
         if (a < b):
             return True
+        
     elif (operator == "!"):
         if (a != b):
             return True
@@ -214,15 +211,15 @@ def compare(a, operator, b):
     
 
 def readInfo(varFile, conFile):
-    varFile = open(varFile, "r")
+    varFile = open(varFile, "r")    #Open up the files
     conFile = open(conFile, "r")
     
     varDict = {}
     varLines = varFile.readlines()
     varFile.close()
-    for line in varLines:
+    for line in varLines:   #Split the lines into their components
         vals = line.split()
-        varDict[vals[0][0]] = vals[1:len(vals)]
+        varDict[vals[0][0]] = vals[1:len(vals)] #The variable is the first character of the first part of line
 
     constraints = conFile.readlines()
     conFile.close()
@@ -234,20 +231,20 @@ def readInfo(varFile, conFile):
 def solveConstraints(varDict, constraints, varAssignments, varOrder, fc):
     global path
     varToAssign = getVariable(varAssignments, varDict.copy(), constraints)
-    varOrder.append(varToAssign)
-    if len(varDict[varToAssign]) == 0:
+    varOrder.append(varToAssign)    #Add the variable to the order so we print it out in order
+    if len(varDict[varToAssign]) == 0:  #If there are no legal values, return
         return varDict
-    while len(varDict[varToAssign]) > 0:
-        varAssignments[varToAssign], newVarDict = getValue(varAssignments, varDict.copy(), varToAssign, constraints, fc)
+    while len(varDict[varToAssign]) > 0:    #Keep looking for a legal assignment until there are no legal values left
+        varAssignments[varToAssign], newVarDict = getValue(varAssignments, varDict.copy(), varToAssign, constraints, fc)    #Get the best variable and resulting set of legal values for that value
         solved = True
 
-        if fc:
+        if fc:  #If we're forward checking, use the variable dictionary obtained above and check for variables without legal values
             varDict = newVarDict
             for key in newVarDict:
                 if len(varDict[key]) == 0:
                     solved = False
 
-        if solved:
+        if solved:  #If there wasn't an issue with error checking, find out if there are any constraints we're violating
             for constraint in constraints:
                 var1 = constraint[0]
                 op = constraint[1]
@@ -270,39 +267,34 @@ def solveConstraints(varDict, constraints, varAssignments, varOrder, fc):
                             solved = False
                             break
 
-        if not solved:
+        if not solved:  #If there was some error above, print a failure and return
             toPrint = str(path) + ". "
             for var in varOrder:
                 toPrint += var + "=" + varAssignments[var] + ", "
             toPrint = toPrint[:len(toPrint)-2] + "  failure"
             print toPrint
             path += 1
+            print varAssignments
+            print varDict
             varDict[varToAssign].remove(varAssignments[varToAssign])
             del varAssignments[varToAssign]
-        elif len(varAssignments) == len(varDict):
+        elif len(varAssignments) == len(varDict):   #If there was no issue, print the solution and return
             toPrint = str(path) + ". "
             for var in varOrder:
                 toPrint += var + "=" + varAssignments[var] + ", "
             toPrint = toPrint[:len(toPrint)-2] + "  solution"
             print toPrint
             return True
-        else:
-            varDict = solveConstraints(varDict.copy(), constraints, varAssignments.copy(), varOrder, fc)
-            if varDict == True:
+        else:   #If it neither failed nor succeeded, try the next variable
+            success = solveConstraints(varDict.copy(), constraints, varAssignments.copy(), varOrder, fc)
+            if success == True: #If that succeeded, stop searching
                 return True
             else:
-                varDict[varToAssign].remove(varAssignments[varToAssign])
+                varDict[varToAssign].remove(varAssignments[varToAssign])    #If it didn't, remove the current assignment and continue
                 del varAssignments[varToAssign]
                 
-    toPrint = str(path) + ". "
-    for var in varOrder:
-        toPrint += var + "=" + varAssignments[var] + ", "
-    toPrint = toPrint[:len(toPrint)-2] + "  failure"
-    print toPrint
-    path += 1
-    varDict[varToAssign].remove(varAssignments[varToAssign])
-    del varAssignments[varToAssign]
-    return varDict
+    varOrder.remove(varToAssign)
+    return False
 
 path = 1
 params = sys.argv
