@@ -1,54 +1,58 @@
 import sys
-
+import copy
 
 # find least constraining value
 # the one that rules out the fewest values in the remaining variables
 # varAssignment: dict type, variables and their assigned values
 # varToAssign: this is the variable we are trying to find a value for it
 
-def getValue(varAssignments, varDict, varToAssign, constraints):
+def getValue(varAssignments, varDict, varToAssign, constraints, fc):
 
     # so... try each possible values to this variable
     
     # based on constraints, remove some of the values of varToAssign
 
-    candidateValues = findCandidateValues(varAssignments, varDict, varToAssign, constraints)
-    
+    if fc:
+        candidateValues = findCandidateValues(varAssignments, varDict, varToAssign, constraints)
+    else:
+        candidateValues = varDict[varToAssign]
+  
     dictKeys = varDict.keys()
     assignedVars = varAssignments.keys()
-    unassignedVars = list(set(dictKeys)-set(assignedVars))
+    unassignedVars = list(set(dictKeys)-set(assignedVars) - set(varToAssign))
 
 
     # now choose which of these values?
     # actually assign it,
 
-    newVarAssignments = varAssignments
-    
-    dictNumberOfAllRemainingValues = {}
+    mostVals = 0
     # after assigning a possible value to a variable
     # add all values still possible to the rest of the variables
-
+    print varToAssign
     for val in candidateValues:
+        print "Assigned to " + str(val)
+        thisDict = {}
         
-        dictNumberOfAllRemainingValues[val] = 0
-        newVarAssignments[varToAssign] = val # assign it
+        numberOfAllRemainingValues = 0
+        varAssignments[varToAssign] = val # assign it
 
         for var in unassignedVars:
-            dictNumberOfAllRemainingValues[val] += len(findCandidateValues(newVarAssignments, varDict, var, constraints))
-
-        newVarAssignments = varAssignments # clear the assignment
-
-    
-    return max(dictNumberOfAllRemainingValues, key = dictNumberOfAllRemainingValues.get)
-        
-        
-        
+            thisDict[var] = findCandidateValues(varAssignments, varDict, var, constraints)
+            numberOfAllRemainingValues += len(thisDict[var])
+            print var + " has " + str(len(thisDict[var])) + " remaining values"#, they are: " + str(thisDict[var])
+        if numberOfAllRemainingValues > mostVals:
+            mostVals = numberOfAllRemainingValues
+            bestDict = thisDict
+            bestVal = val
         
 
+    for var in assignedVars:
+        bestDict[var] = varAssignments[var]
+    return (bestVal, bestDict)
 
 def findCandidateValues(varAssignments, varDict, varToAssign, constraints):
     assignedVars = varAssignments.keys()
-    candidateValues = varDict[varToAssign]
+    candidateValues = copy.copy(varDict[varToAssign])
     for constraint in constraints:
         if constraint[0] == varToAssign and constraint[2] in assignedVars:
                 
@@ -107,17 +111,39 @@ def findMostConstrainingVariable(candidateVariables, varAssignments, varDict, co
             if constraint[0] == var or constraint[2] == var:
                 if not constraint[0] in assignedVars and not constraint[2] in assignedVars:
                     dictNumberOfConstraints[var] += 1
+    print dictNumberOfConstraints
                     
         
 
     # return the variable with the max value in dictNumberOfConstraints
-    # and it should be the first one, so it is breaking ties by alphabetical order 
-    return max(dictNumberOfConstraints, key = dictNumberofConstraints.get)
+    # and it should be the first one, so it is breaking ties by alphabetical order
+    maxConstraints = -1
+    for var in dictNumberOfConstraints:
+        if dictNumberOfConstraints[var] > maxConstraints:
+            maxConstraints = dictNumberOfConstraints[var]
+            bestVar = var
+        elif dictNumberOfConstraints[var] == maxConstraints:
+            if var < bestVar:
+                bestVar = var
+    return bestVar
+        
+    #return max(dictNumberOfConstraints, key = dictNumberOfConstraints.get)
     
        
 
 def findMostConstrainedVariables(varAssignments, varDict, constraints):
-    # variable with the fewest legal values
+    leastVals = 9999999
+    bestVars = []
+    for var in varDict:
+        if len(varDict[var]) < leastVals:
+            if var not in varAssignments:
+                leastVals = len(varDict[var])
+                bestVars = [var]
+        elif len(varDict[var]) == leastVals:
+            if var not in varAssignments:
+                bestVars.append(var)
+    return bestVars
+    """# variable with the fewest legal values
     
     # get unassigned variables
 
@@ -162,7 +188,7 @@ def findMostConstrainedVariables(varAssignments, varDict, constraints):
     minLength = min(listOfLength)
     minLengthVariables = [val[0] for index, val in enumerate(listOfLength) if val == minLength]
 
-    return minLengthVariables
+    return minLengthVariables"""
     
 
     
@@ -178,7 +204,10 @@ def compare(a, operator, b):
 
     elif (operator == "<"):
         if (a < b):
-            return Trye
+            return True
+    elif (operator == "!"):
+        if (a != b):
+            return True
 
     return False
     
@@ -202,17 +231,18 @@ def readInfo(varFile, conFile):
 
     return varDict, constraints
 
-def solveConstraints(varDict, constraints, varAssignments, fc):
-    
-    varToAssign = getVariable(varAssignments, varDict, constraints)
+def solveConstraints(varDict, constraints, varAssignments, varOrder, fc):
+    global path
+    varToAssign = getVariable(varAssignments, varDict.copy(), constraints)
+    varOrder.append(varToAssign)
     if len(varDict[varToAssign]) == 0:
         return varDict
     while len(varDict[varToAssign]) > 0:
-        varAssignments[varToAssign] = getValue(varAssignments, varDict.copy(), varToAssign, constraints)
-        print "solveConstraints"
+        varAssignments[varToAssign], newVarDict = getValue(varAssignments, varDict.copy(), varToAssign, constraints, fc)
         solved = True
 
         if fc:
+            varDict = newVarDict
             for key in newVarDict:
                 if len(varDict[key]) == 0:
                     solved = False
@@ -242,38 +272,39 @@ def solveConstraints(varDict, constraints, varAssignments, fc):
 
         if not solved:
             toPrint = str(path) + ". "
-            for var in varAssignments:
+            for var in varOrder:
                 toPrint += var + "=" + varAssignments[var] + ", "
             toPrint = toPrint[:len(toPrint)-2] + "  failure"
             print toPrint
+            path += 1
             varDict[varToAssign].remove(varAssignments[varToAssign])
-            assignedVars.remove(varToAssign)
             del varAssignments[varToAssign]
-            return varDict
         elif len(varAssignments) == len(varDict):
             toPrint = str(path) + ". "
-            for var in varAssignments:
+            for var in varOrder:
                 toPrint += var + "=" + varAssignments[var] + ", "
             toPrint = toPrint[:len(toPrint)-2] + "  solution"
             print toPrint
             return True
         else:
-            varDict = solveConstraints(varDict.copy(), constraints, varAssignments.copy(), fc)
+            varDict = solveConstraints(varDict.copy(), constraints, varAssignments.copy(), varOrder, fc)
             if varDict == True:
                 return True
+            else:
+                varDict[varToAssign].remove(varAssignments[varToAssign])
+                del varAssignments[varToAssign]
+                
     toPrint = str(path) + ". "
-    for var in varAssignments:
+    for var in varOrder:
         toPrint += var + "=" + varAssignments[var] + ", "
     toPrint = toPrint[:len(toPrint)-2] + "  failure"
     print toPrint
-    print varDict
+    path += 1
     varDict[varToAssign].remove(varAssignments[varToAssign])
-    assignedVars.remove(varToAssign)
     del varAssignments[varToAssign]
     return varDict
 
 path = 1
 params = sys.argv
-print params
 varDict, constraints = readInfo(params[1], params[2])
-solveConstraints(varDict, constraints, {}, params[3] == "fc")
+solveConstraints(varDict, constraints, {}, [], params[3] == "fc")
